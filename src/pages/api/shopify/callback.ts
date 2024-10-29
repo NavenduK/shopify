@@ -9,15 +9,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'No code provided' });
   }
 
-  const clientId = process.env.NEXT_PUBLIC_SHOPIFY_CLIENT_ID; // Correct usage of environment variable
-  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET; // Server-side variable
+  const clientId = process.env.NEXT_PUBLIC_SHOPIFY_CLIENT_ID;
+  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
   const shopName = process.env.NEXT_PUBLIC_SHOPIFY_STORE_NAME;
 
   if (!clientId || !clientSecret || !shopName) {
+    console.error('Missing environment variables:', {
+      clientId,
+      clientSecret: clientSecret ? 'Provided' : 'Not provided',
+      shopName,
+    });
     return res.status(500).json({ error: 'Missing environment variables' });
   }
 
-  // Exchange authorization code for access token
   try {
     const response = await axios.post(`https://${shopName}.myshopify.com/admin/oauth/access_token`, {
       client_id: clientId,
@@ -26,10 +30,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     const accessToken = response.data.access_token;
-    // You can now use this access token to make API requests to Shopify
     res.status(200).json({ accessToken });
-  } catch (error) {
-    console.error('Error obtaining access token:', error.response?.data || error.message);
+  } catch (error: unknown) {
+    // Type guard to check if error is an AxiosError
+    if (axios.isAxiosError(error)) {
+      console.error('Error obtaining access token:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
+    } else {
+      // General error logging for non-Axios errors
+      console.error('An unexpected error occurred:', error);
+    }
+
     res.status(500).json({ error: 'Failed to obtain access token' });
   }
 }
